@@ -19,12 +19,15 @@ ggplot(NBA[NBA$Player=="LeBron James", ], aes(x=GameDay, y=PTS, group=1)) + geom
 ***Data Wrangling***
 
 ```{r}
-NBA$Season <- ifelse(month(NBA$GameDay) %in% c(10, 11, 12, 1, 2, 3, 4), 
+NBA$Season <- ifelse(month(NBA$GameDay) %in% c(8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6), 
                          year(NBA$GameDay), 
                          year(NBA$GameDay) - 1) 
 #this part calculates the previous and following year to make sure the graph stays in numerical order, I found from a quick google search that the NBA season is from October to April of the following year.
 
-NBA1 <- NBA %>%
+Playoffs <- filter(NBA, Playoffs == "Y")
+Reg_season <- filter(NBA, Playoffs == "0")
+
+Regular_season_df <- Reg_season %>%
   group_by(Player, Season) %>%
   summarise(
     Avg_PTS = mean(PTS),
@@ -34,7 +37,17 @@ NBA1 <- NBA %>%
     Avg_BLK = mean(BLK)
   )
 
-head(NBA1)
+Playoffs_df <- Playoffs %>%
+  group_by(Player, Season) %>%
+  summarise(
+    Avg_PTS = mean(PTS),
+    Avg_AST = mean(AST),
+    Avg_REB = mean(REB),
+    Avg_STL = mean(STL),
+    Avg_BLK = mean(BLK)
+  )
+# Make NBA2 for all stats where playoffs == 1
+head(Playoffs_df)
 ```
 
 ***Initial Graph Filtering LeBron Data***
@@ -70,7 +83,7 @@ library(ggplot2)
 
 ui <- fluidPage(
   theme = shinytheme("superhero"),
-  titlePanel("NBA Player Average Statistics"),
+  titlePanel(div(style = "text-align: center;", "NBA Player Average Statistics")),
   sidebarLayout(
     sidebarPanel(
       selectInput(inputId = "player", 
@@ -78,8 +91,12 @@ ui <- fluidPage(
                     choices = unique(NBA1$Player)),
       selectInput(inputId = "stat", 
                     label = "Select Statistic:", 
-                    choices = c("Avg_PTS", "Avg_BLK", "Avg_AST", "Avg_REB", "Avg_STL"))
+                    choices = c("Avg_PTS", "Avg_BLK", "Avg_AST", "Avg_REB", "Avg_STL")),
+      selectInput(inputId = "season_type", 
+                    label = "Select Season Type:", 
+                    choices = c("Regular Season", "Playoffs"))
     ),
+    # Add select input for either Playoffs or Regular Season
     mainPanel(
       plotOutput("player_graph")
     )
@@ -87,18 +104,52 @@ ui <- fluidPage(
 )
 
 server <- function(input, output) {
+  # if inputID Season_Type == "playoffs"
+  # Display already made ggplot but with NBA2 as the dataset
+  # else, display this:
   output$player_graph <- renderPlot({
-    player_data <- NBA1 %>% 
+    if(input$season_type == "Playoffs") {
+      player_data <- Playoffs_df %>% 
       filter(Player == input$player)
+    }else {
+      player_data <- Regular_season_df %>%
+        filter(Player == input$player)
+    }
     
-    ggplot(player_data, aes(x = Season, y = !!sym(input$stat))) + 
+    
+    
+    ggplot(player_data, aes(x = Season, y = !!sym(input$stat)))+theme(plot.title = element_text(hjust = 0.5)) + 
       geom_line(color = "blue") + 
       geom_point() + 
       labs(x = "Season", y = input$stat, title = "Average NBA Player Statistics") + 
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5), panel.border = element_rect(fill = NA, color = "red", size = 2)) + 
       scale_y_continuous(limits = c(0, max(player_data[, input$stat])))
   })
 }
 
 shinyApp(ui, server)
 ```
+
+***Adding Playoff thingy***
+```{r}
+NBA$Season <- ifelse(month(NBA$GameDay) %in% c(10, 11, 12, 1, 2, 3, 4), 
+                         year(NBA$GameDay), 
+                         year(NBA$GameDay) - 1) 
+#this part calculates the previous and following year to make sure the graph stays in numerical order, I found from a quick google search that the NBA season is from October to April of the following year.
+Playoffs <- filter(NBA, Playoffs == "Y")
+
+
+NBA2 <- Playoffs %>% # playoffs == 0
+  group_by(Player, Season) %>%
+  summarise(
+    Avg_PTS = mean(PTS),
+    Avg_AST = mean(AST),
+    Avg_REB = mean(REB),
+    Avg_STL = mean(STL),
+    Avg_BLK = mean(BLK)
+  )
+
+# Make NBA2 for all stats where playoffs == 1
+head(NBA2)
+```
+

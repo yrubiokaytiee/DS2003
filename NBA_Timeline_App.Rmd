@@ -8,7 +8,7 @@ output: html_document
 ```{r}
 library(tidyverse)
 library(shiny)
-NBA<-read.csv("data/DS2003_NBA_Data.csv")
+NBA<-read.csv("DS2003_NBA_Data.csv")
 head(NBA)
 ```
 
@@ -52,8 +52,6 @@ head(Playoffs_df)
 
 ***App Creation***
 
-In the panel above I looked up how to make the dates at a 90 degree angle so onlookers can see each one clearly, and then I make it so that the points all starts from 0 so viewers can see how different players differ when looking at the app more clearly. I'm having trouble doing that to the x axis
-
 ```{r}
 library(shiny)
 library(shinythemes)
@@ -75,7 +73,8 @@ ui <- fluidPage(
                     choices = c("Avg_PTS", "Avg_BLK", "Avg_AST", "Avg_REB", "Avg_STL")),
       radioButtons(inputId = "season_type", 
                label = "Select Season Type:", 
-               choices = c("Regular Season", "Playoffs"))
+               choices = c("Regular Season", "Playoffs")),
+      uiOutput("description")
 
     ),
     
@@ -86,7 +85,11 @@ ui <- fluidPage(
 )
 
 server <- function(input, output) {
-  
+  output$description <- renderUI({
+    HTML("<b>This app displays the average NBA player statistics for the selected player and season type.</b>
+    
+     <div style='margin-top: 10px'>The data is based on the NBA player statistics from the regular season and playoffs. Choose a player of interest and a statistic you are interested in testing to see the player's performance per season over their career. Enjoy!</div>")
+  })
   output$player_graph <- renderPlot({
     if(input$season_type == "Playoffs") {
       player_data <- Playoffs_df %>% 
@@ -101,7 +104,7 @@ server <- function(input, output) {
     ggplot(player_data, aes(x = Season, y = !!sym(input$stat)))+theme(plot.title = element_text(hjust = 0.5)) + 
       geom_line(color = "blue") + 
       geom_point() + 
-      labs(x = "Season", y = input$stat, title = "Average NBA Player Statistics") + 
+      labs(x = "Season", y = input$stat, title = "Average NBA Player Statistics", caption = "Individual Player Statistics over Time") + 
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5), panel.border = element_rect(fill = NA, color = "red", size = 2)) + 
       scale_y_continuous(limits = c(0, max(player_data[, input$stat])))
   })
@@ -110,101 +113,4 @@ server <- function(input, output) {
 shinyApp(ui, server)
 ```
 
-
-***Trying to Animate***
-
-```{r}
-library(gganimate)
-
-ui <- fluidPage(
-  theme = shinytheme("superhero"),
-  titlePanel(div(style = "text-align: center;", 
-                    "NBA Player Average Statistics")),
-  sidebarLayout(
-    sidebarPanel(
-      selectizeInput(inputId = "player", 
-                    label = "Select Player:", 
-                    choices = unique(NBA$Player),
-                    multiple = FALSE
-                    ),
-      selectInput(inputId = "stat", 
-                    label = "Select Statistic:", 
-                    choices = c("Avg_PTS", "Avg_BLK", "Avg_AST", "Avg_REB", "Avg_STL")),
-      radioButtons(inputId = "season_type", 
-               label = "Select Season Type:", 
-               choices = c("Regular Season", "Playoffs"))
-
-    ),
-
-        mainPanel(
-      plotOutput("player_graph")
-    )
-  )
-)
-
-server <- function(input, output) {
-  
-  output$player_graph <- renderPlot({
-    if(input$season_type == "Playoffs") {
-      player_data <- Playoffs_df %>% 
-        filter(Player == input$player)
-    }else {
-      player_data <- Regular_season_df %>%
-        filter(Player == input$player)
-    }
-    
-    ggplot(player_data, aes(x = Season, y = !!sym(input$stat))) + 
-      theme(plot.title = element_text(hjust = 0.5)) + 
-      geom_line(color = "blue") + 
-      geom_point() + 
-      labs(x = "Season", y = input$stat, title = "Average NBA Player Statistics") + 
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5), panel.border = element_rect(fill = NA, color = "red", size = 2)) + 
-      scale_y_continuous(limits = c(0, max(player_data[, input$stat]))) + 
-      transition_reveal(Season) + #not working :(
-      ease_aes("linear")
-  })
-}
-shinyApp(ui, server)
-```
-
-
-***Trying to make Interactive***
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Extra Code:
-
-***Adding Playoff thingy***
-```{r}
-NBA$Season <- ifelse(month(NBA$GameDay) %in% c(10, 11, 12, 1, 2, 3, 4), 
-                         year(NBA$GameDay), 
-                         year(NBA$GameDay) - 1) 
-#this part calculates the previous and following year to make sure the graph stays in numerical order, I found from a quick google search that the NBA season is from October to April of the following year.
-Playoffs <- filter(NBA, Playoffs == "Y")
-
-
-NBA2 <- Playoffs %>% # playoffs == 0
-  group_by(Player, Season) %>%
-  summarise(
-    Avg_PTS = mean(PTS),
-    Avg_AST = mean(AST),
-    Avg_REB = mean(REB),
-    Avg_STL = mean(STL),
-    Avg_BLK = mean(BLK)
-  )
-
-# Make NBA2 for all stats where playoffs == 1
-head(NBA2)
-```
 

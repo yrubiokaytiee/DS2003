@@ -51,7 +51,7 @@ library(ggplot2)
 
 ui <- fluidPage(
   theme = shinytheme("superhero"),
-  titlePanel(div(style = "text-align: center;", "NBA Player Average Statistics")),
+  titlePanel(div(style = "text-align: center;", "NBA Player Shot Selection Over Time")),
   sidebarLayout(
     sidebarPanel(
       selectInput(inputId = "player", 
@@ -76,9 +76,8 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   output$description <- renderUI({
- HTML("<b>This app displays each player's attempted or made 3 pointers vs attempted or made 2 pointers by a full season that they were in the NBA.</b><div style='margin-top: 10px'>The data is based on the NBA player statistics from the regular season. Choose a player of interest and a type of shot you are interested in, and see the player's shooting trends over time. Enjoy!</div>")
+ HTML("<b>This app displays each player's attempted or made 3 pointers vs attempted or made 2 pointers by a full season that they were in the NBA.</b><div style='margin-top: 10px'>The data is based on the NBA player statistics from the regular season. Choose a player of interest and a type of shot (made, attempted) you are interested in, and see the player's shooting trends over time. Enjoy!</div>")
   })
-})
 
   # Reactive expression to filter data based on the selected player
   filtered_data <- reactive({
@@ -102,10 +101,10 @@ server <- function(input, output, session) {
   
   # Plot rendering
   output$player_graph <- plotly::renderPlotly({
-    req(input$player, input$year)  # Ensure inputs are not NULL
-    
-    if(input$attempted_or_made == "Made") {
-      player_data <- NBA %>%
+  req(input$player, input$year)  # Ensure inputs are not NULL
+  
+  if (input$attempted_or_made == "Made") {
+    player_data <- NBA %>%
       filter(Player == input$player, Season == input$year) %>%
       group_by(Player, Season) %>%
       summarize(
@@ -113,9 +112,12 @@ server <- function(input, output, session) {
         Total_2FM = sum(FGM, na.rm = TRUE) - sum(`X3FM`, na.rm = TRUE),  # Total 2-point FGM
         .groups = "drop"
       ) %>%
-      pivot_longer(cols = c(Total_3FM, Total_2FM), names_to = "Type", values_to = "Value")
-    } else {
-      player_data <- NBA %>%
+      pivot_longer(cols = c(Total_3FM, Total_2FM), names_to = "Type", values_to = "Value") %>%
+      mutate(
+        TypeLabel = ifelse(Type == "Total_3FM", "3-Point Field Goals Made", "2-Point Field Goals Made")  # Custom labels
+      )
+  } else {
+    player_data <- NBA %>%
       filter(Player == input$player, Season == input$year) %>%
       group_by(Player, Season) %>%
       summarize(
@@ -123,39 +125,46 @@ server <- function(input, output, session) {
         Total_2FA = sum(FGA, na.rm = TRUE) - sum(`X3FA`, na.rm = TRUE), 
         .groups = "drop"
       ) %>%
-      pivot_longer(cols = c(Total_3FA, Total_2FA), names_to = "Type", values_to = "Value")
-    }
-    
-    req(nrow(player_data) > 0)  # Ensure there's data to plot
-    
-    # Dynamic plot title
-    plot_title <- paste(input$player, ifelse(input$attempted_or_made == "Made",": 3FM vs 2FM (", ": 3FA vs 2FA ("), input$year, " Season)", sep = "")
-    
-    # Create interactive pie chart using plotly
-    plotly::plot_ly(player_data, 
-          labels = ~Type,
-          values = ~Value, 
-          type = 'pie', 
-          textinfo = 'percent',  # Show percentage on hover
-          hoverinfo = 'label+percent',  # Display label and percentage on hover
-          marker = list(colors = c("skyblue", "orange")))%>%
-          plotly::layout(
-            title = list(
-              text = plot_title,       # Set the dynamic title text
-              x = 0.5,                 # Center the title horizontally
-              xanchor = "center",      # Anchor title in the center
-              y = 0.95,                # Position the title towards the top
-              yanchor = "top",         # Anchor title at the top
-              pad = list(t = 20)       # Add padding to the top of the title (20 px)
-            ),
-            margin = list(
-              t = 80,  # Top margin, gives space for the title
-              b = 50,  # Bottom margin
-              l = 50,  # Left margin
-              r = 50   # Right margin
-            )
-          )
-        })
+      pivot_longer(cols = c(Total_3FA, Total_2FA), names_to = "Type", values_to = "Value") %>%
+      mutate(
+        TypeLabel = ifelse(Type == "Total_3FA", "3-Point Field Goals Attempted", "2-Point Field Goals Attempted")  # Custom labels
+      )
+  }
+  
+  req(nrow(player_data) > 0)  # Ensure there's data to plot
+  
+  # Dynamic plot title
+  plot_title <- paste(input$player, ifelse(input$attempted_or_made == "Made", ": 3FM vs 2FM (", ": 3FA vs 2FA ("), input$year, " Season)", sep = "")
+  
+  # Create interactive pie chart using plotly
+  plotly::plot_ly(
+    player_data, 
+    labels = ~TypeLabel,  # Use the new custom labels column
+    values = ~Value, 
+    type = 'pie', 
+    textinfo = 'percent',  # Show percentage on hover
+    hoverinfo = 'text',    # Customize hover text
+    text = ~paste(TypeLabel, ": ", Value),  # Define custom text to show on hover
+    marker = list(colors = c("skyblue", "orange"))
+  ) %>%
+    plotly::layout(
+      title = list(
+        text = plot_title,       # Set the dynamic title text
+        x = 0.5,                 # Center the title horizontally
+        xanchor = "center",      # Anchor title in the center
+        y = 0.95,                # Position the title towards the top
+        yanchor = "top",         # Anchor title at the top
+        pad = list(t = 20)       # Add padding to the top of the title (20 px)
+      ),
+      margin = list(
+        t = 80,  # Top margin, gives space for the title
+        b = 50,  # Bottom margin
+        l = 50,  # Left margin
+        r = 50   # Right margin
+      )
+    )
+})
+
 }
 
 shinyApp(ui, server)

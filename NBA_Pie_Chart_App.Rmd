@@ -170,3 +170,15 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 
 ```
+
+**App Deployment**
+```{r}
+library(rsconnect)
+
+rsconnect::setAccountInfo(name='ds2002nbadata',
+			  token=Sys.getenv('ACCOUNT_TOKEN'),
+			  secret=Sys.getenv('ACCOUNT_SECRET'))
+
+rsconnect::deployApp()
+```
+

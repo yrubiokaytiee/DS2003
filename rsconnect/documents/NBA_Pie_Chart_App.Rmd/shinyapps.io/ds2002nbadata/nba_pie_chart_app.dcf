@@ -1,0 +1,10 @@
+name: nba_pie_chart_app
+title:
+username: ds2002nbadata
+account: ds2002nbadata
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13490197
+bundleId: 9443445
+url: https://ds2002nbadata.shinyapps.io/nba_pie_chart_app/
+version: 1

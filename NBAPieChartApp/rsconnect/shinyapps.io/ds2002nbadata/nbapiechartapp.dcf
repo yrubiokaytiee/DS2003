@@ -1,0 +1,10 @@
+name: nbapiechartapp
+title:
+username: ds2002nbadata
+account: ds2002nbadata
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13490345
+bundleId: 9443488
+url: https://ds2002nbadata.shinyapps.io/nbapiechartapp/
+version: 1

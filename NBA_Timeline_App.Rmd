@@ -8,7 +8,7 @@ output: html_document
 ```{r}
 library(tidyverse)
 library(shiny)
-NBA<-read.csv("DS2003_NBA_Data.csv")
+NBA<-read.csv("data/DS2003_NBA_Data.csv")
 head(NBA)
 ```
 

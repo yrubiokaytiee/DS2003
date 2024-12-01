@@ -6,38 +6,43 @@ output: html_document
 ---
 
 ```{r}
-library(tidyverse,shiny)
+library(tidyverse,shiny,plotly)
 NBA<-read.csv("data/DS2003_NBA_Data.csv")
 ```
 
 ```{r}
-# Example data frame
-data <- data.frame(
-  Category = c('Player1', 'Player2', 'Player3'),
-  FGA = c(10, 15, 20),
-  FGM = c(8, 12, 16),
-  `3FA` = c(5, 8, 7),
-  `3FM` = c(3, 6, 5)
-)
-
-# Reshape the data from wide to long format
-library(tidyr)
-data_long <- data %>%
-  pivot_longer(cols = -Category, names_to = "Metric", values_to = "Value")
-
-# Create the grouped bar chart
-ggplot(data_long, aes(x = Category, y = Value, fill = Metric)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.35) +
-  labs(title = "FGA/FGM and 3FA/3FM Comparison", x = "Player", y = "Value") +
-  scale_fill_manual(values = c("FGA" = "blue", "FGM" = "red", "3FA" = "green", "3FM" = "orange")) +
-  theme_minimal()
+NBA$Season <- ifelse(month(NBA$GameDay) %in% c(8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6), 
+                         year(NBA$GameDay), 
+                         year(NBA$GameDay) - 1) 
+```
+```{r}
+player_data <- NBA %>%
+      filter(Player == "LeBron James", Season == 2003) %>%
+      group_by(Player, Season) %>%
+      summarize(
+        Total_3FM = sum(`X3FM`, na.rm = TRUE),  # Total 3-point FGM
+        Total_2FM = sum(FGM, na.rm = TRUE) - sum(`X3FM`, na.rm = TRUE),  # Total 2-point FGM
+        .groups = "drop"
+      ) %>%
+      pivot_longer(cols = c(Total_3FM, Total_2FM), names_to = "Type", values_to = "Value")
+player_data
 ```
 
+```{r}
+player_data <- NBA %>%
+      filter(Player == "LeBron James", Season == 2003) %>%
+      group_by(Player, Season) %>%
+      summarize(
+        Total_3FA = sum(`X3FA`, na.rm = TRUE), 
+        Total_2FA = sum(FGA, na.rm = TRUE) - sum(`X3FA`, na.rm = TRUE), 
+        .groups = "drop"
+      ) %>%
+      pivot_longer(cols = c(Total_3FA, Total_2FA), names_to = "Type", values_to = "Value")
+
+player_data
+```
 
 ***App Creation***
-
-
-In the panel above I looked up how to make the dates at a 90 degree angle so onlookers can see each one clearly, and then I make it so that the points all starts from 0 so viewers can see how different players differ when looking at the app more clearly. I'm having trouble doing that to the x axis
 
 ```{r}
 library(shiny)
@@ -50,69 +55,104 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput(inputId = "player", 
-                    label = "Select Player:", 
-                    choices = unique(NBA$Player)),
-      selectInput(inputId = "stat", 
-                    label = "Select Statistic:", 
-                    choices = c("Avg_PTS", "Avg_BLK", "Avg_AST", "Avg_REB", "Avg_STL")),
-      selectInput(inputId = "season_type", 
-                    label = "Select Season Type:", 
-                    choices = c("Regular Season", "Playoffs"))
+                  label = "Select Player:", 
+                  choices = unique(NBA$Player)),
+      sliderInput(inputId = "year", 
+                  label = "Select Year:", 
+                  min = 2000,  # Placeholder min; will be updated dynamically
+                  max = 2023,  # Placeholder max; will be updated dynamically
+                  value = 2000),  # Placeholder value; will be updated dynamically
+      radioButtons(inputId = "attempted_or_made", 
+                  label = "Select Statistic Type:", 
+                  choices = c("Made", "Attempted")),
+      textOutput("description")
     ),
-    # Add select input for either Playoffs or Regular Season
+    
     mainPanel(
-      plotOutput("player_graph")
+      plotly::plotlyOutput("player_graph")
     )
   )
 )
 
-server <- function(input, output) {
-  # if inputID Season_Type == "playoffs"
-  # Display already made ggplot but with NBA2 as the dataset
-  # else, display this:
-  output$player_graph <- renderPlot({
-    if(input$season_type == "Playoffs") {
-      player_data <- Playoffs_df %>% 
-      filter(Player == input$player)
-    }else {
-      player_data <- Regular_season_df %>%
-        filter(Player == input$player)
+server <- function(input, output, session) {
+  # Reactive expression to filter data based on the selected player
+  filtered_data <- reactive({
+    req(input$player)  # Ensure input$player is not NULL
+    NBA %>% filter(Player == input$player)
+  })
+  
+  # Observe changes in `player` input and update sliderInput
+  observe({
+    player_data <- filtered_data()
+    req(nrow(player_data) > 0)  # Ensure there is data for the selected player
+    
+    min_year <- min(player_data$Season, na.rm = TRUE)
+    max_year <- max(player_data$Season, na.rm = TRUE)
+    
+    updateSliderInput(session, "year",
+                      min = min_year,
+                      max = max_year,
+                      value = min_year)  # Default to the earliest season
+  })
+  
+  # Plot rendering
+  output$player_graph <- plotly::renderPlotly({
+    req(input$player, input$year)  # Ensure inputs are not NULL
+    
+    if(input$attempted_or_made == "Made") {
+      player_data <- NBA %>%
+      filter(Player == input$player, Season == input$year) %>%
+      group_by(Player, Season) %>%
+      summarize(
+        Total_3FM = sum(`X3FM`, na.rm = TRUE),  # Total 3-point FGM
+        Total_2FM = sum(FGM, na.rm = TRUE) - sum(`X3FM`, na.rm = TRUE),  # Total 2-point FGM
+        .groups = "drop"
+      ) %>%
+      pivot_longer(cols = c(Total_3FM, Total_2FM), names_to = "Type", values_to = "Value")
+    } else {
+      player_data <- NBA %>%
+      filter(Player == input$player, Season == input$year) %>%
+      group_by(Player, Season) %>%
+      summarize(
+        Total_3FA = sum(`X3FA`, na.rm = TRUE), 
+        Total_2FA = sum(FGA, na.rm = TRUE) - sum(`X3FA`, na.rm = TRUE), 
+        .groups = "drop"
+      ) %>%
+      pivot_longer(cols = c(Total_3FA, Total_2FA), names_to = "Type", values_to = "Value")
     }
     
+    req(nrow(player_data) > 0)  # Ensure there's data to plot
     
+    # Dynamic plot title
+    plot_title <- paste(input$player, ifelse(input$attempted_or_made == "Made",": 3FM vs 2FM (", ": 3FA vs 2FA ("), input$year, " Season)", sep = "")
     
-    ggplot(player_data, aes(x = Season, y = !!sym(input$stat)))+theme(plot.title = element_text(hjust = 0.5)) + 
-      geom_line(color = "blue") + 
-      geom_point() + 
-      labs(x = "Season", y = input$stat, title = "Average NBA Player Statistics") + 
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5), panel.border = element_rect(fill = NA, color = "red", size = 2)) + 
-      scale_y_continuous(limits = c(0, max(player_data[, input$stat])))
-  })
+    # Create interactive pie chart using plotly
+    plotly::plot_ly(player_data, 
+          labels = ~Type,
+          values = ~Value, 
+          type = 'pie', 
+          textinfo = 'percent',  # Show percentage on hover
+          hoverinfo = 'label+percent',  # Display label and percentage on hover
+          marker = list(colors = c("skyblue", "orange")))%>%
+          plotly::layout(
+            title = list(
+              text = plot_title,       # Set the dynamic title text
+              x = 0.5,                 # Center the title horizontally
+              xanchor = "center",      # Anchor title in the center
+              y = 0.95,                # Position the title towards the top
+              yanchor = "top",         # Anchor title at the top
+              pad = list(t = 20)       # Add padding to the top of the title (20 px)
+            ),
+            margin = list(
+              t = 80,  # Top margin, gives space for the title
+              b = 50,  # Bottom margin
+              l = 50,  # Left margin
+              r = 50   # Right margin
+            )
+          )
+        })
 }
 
 shinyApp(ui, server)
+
 ```
-
-***Adding Playoff thingy***
-```{r}
-NBA$Season <- ifelse(month(NBA$GameDay) %in% c(10, 11, 12, 1, 2, 3, 4), 
-                         year(NBA$GameDay), 
-                         year(NBA$GameDay) - 1) 
-#this part calculates the previous and following year to make sure the graph stays in numerical order, I found from a quick google search that the NBA season is from October to April of the following year.
-Playoffs <- filter(NBA, Playoffs == "Y")
-
-
-NBA2 <- Playoffs %>% # playoffs == 0
-  group_by(Player, Season) %>%
-  summarise(
-    Avg_PTS = mean(PTS),
-    Avg_AST = mean(AST),
-    Avg_REB = mean(REB),
-    Avg_STL = mean(STL),
-    Avg_BLK = mean(BLK)
-  )
-
-# Make NBA2 for all stats where playoffs == 1
-head(NBA2)
-```
-

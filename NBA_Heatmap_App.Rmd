@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r}
-library(tidyverse,shiny,plotly)
+library(tidyverse,shiny)
 NBA<-read.csv("data/DS2003_NBA_Data.csv")
 ```
 
@@ -65,7 +65,7 @@ ui <- fluidPage(
       radioButtons(inputId = "attempted_or_made", 
                   label = "Select Statistic Type:", 
                   choices = c("Made", "Attempted")),
-      textOutput("description")
+      uiOutput("description")
     ),
     
     mainPanel(
@@ -75,6 +75,11 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  output$description <- renderUI({
+ HTML("<b>This app displays each player's attempted or made 3 pointers vs attempted or made 2 pointers by a full season that they were in the NBA.</b><div style='margin-top: 10px'>The data is based on the NBA player statistics from the regular season. Choose a player of interest and a type of shot you are interested in, and see the player's shooting trends over time. Enjoy!</div>")
+  })
+})
+
   # Reactive expression to filter data based on the selected player
   filtered_data <- reactive({
     req(input$player)  # Ensure input$player is not NULL
